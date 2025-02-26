@@ -21,6 +21,120 @@ let discs = [];
 let spawnInterval;
 let timerInterval;
 
+// Bonus variables
+let bonusColor = null;
+let bonusActive = false;
+let bonusTimeRemaining = 15;
+let bonusTimer = null;
+
+// Function to start a new bonus round
+function startBonusRound() {
+    if (!gameRunning) return;
+
+    // Select new random color (different from previous)
+    let newColor;
+    do {
+        newColor = DISC_COLORS[Math.floor(Math.random() * DISC_COLORS.length)];
+    } while (newColor === bonusColor);
+
+    bonusColor = newColor;
+    bonusActive = true;
+    bonusTimeRemaining = 15;
+    console.log('New bonus round activated:', bonusColor);
+
+    // Create or update bonus display
+    let bonusDisplay = document.getElementById('bonusDisplay');
+    if (!bonusDisplay) {
+        bonusDisplay = document.createElement('div');
+        bonusDisplay.id = 'bonusDisplay';
+        bonusDisplay.style.position = 'absolute';
+        bonusDisplay.style.top = '50px';
+        bonusDisplay.style.left = '50%';
+        bonusDisplay.style.transform = 'translateX(-50%)';
+        bonusDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        bonusDisplay.style.color = 'white';
+        bonusDisplay.style.padding = '10px 20px';
+        bonusDisplay.style.borderRadius = '5px';
+        bonusDisplay.style.zIndex = '100';
+        bonusDisplay.style.transition = 'all 0.3s ease';
+        bonusDisplay.style.display = 'flex';
+        bonusDisplay.style.alignItems = 'center';
+        bonusDisplay.style.gap = '10px';
+
+        // Create color square
+        const colorSquare = document.createElement('div');
+        colorSquare.style.width = '30px';
+        colorSquare.style.height = '30px';
+        colorSquare.style.borderRadius = '6px';
+        colorSquare.style.border = '2px solid white';
+        colorSquare.style.transition = 'all 0.3s ease';
+        colorSquare.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.3)';
+        colorSquare.style.transform = 'scale(1)';
+        // Add pulsing animation style
+        if (!document.getElementById('pulseAnimation')) {
+            const style = document.createElement('style');
+            style.id = 'pulseAnimation';
+            style.textContent = `
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+                    50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(255, 255, 255, 0.5); }
+                    100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+                }
+                @keyframes hover-pulse {
+                    0% { transform: scale(1.1); }
+                    50% { transform: scale(1.15); }
+                    100% { transform: scale(1.1); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        colorSquare.style.animation = 'pulse 1.5s ease-in-out infinite';
+
+        // Add hover effect with combined animation
+        colorSquare.addEventListener('mouseover', () => {
+            colorSquare.style.animation = 'hover-pulse 1.5s ease-in-out infinite';
+            colorSquare.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.5)';
+        });
+        colorSquare.addEventListener('mouseout', () => {
+            colorSquare.style.animation = 'pulse 1.5s ease-in-out infinite';
+            colorSquare.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.3)';
+        });
+
+        // Create text container
+        const textContainer = document.createElement('div');
+
+        // Add elements to bonus display
+        bonusDisplay.appendChild(colorSquare);
+        bonusDisplay.appendChild(textContainer);
+        document.getElementById('gameContainer').appendChild(bonusDisplay);
+    }
+
+    // Add transition effect for color change
+    bonusDisplay.style.opacity = '0';
+    setTimeout(() => {
+        const colorSquare = bonusDisplay.children[0];
+        const textContainer = bonusDisplay.children[1];
+
+        colorSquare.style.backgroundColor = bonusColor;
+        textContainer.textContent = `Double points for this color: ${bonusTimeRemaining}s`;
+        bonusDisplay.style.opacity = '1';
+    }, 150);
+
+    // Update countdown
+    if (bonusTimer) clearInterval(bonusTimer);
+    bonusTimer = setInterval(() => {
+        if (bonusTimeRemaining > 0) {
+            bonusTimeRemaining--;
+            const textContainer = bonusDisplay.children[1];
+            textContainer.textContent = `Double points for this color: ${bonusTimeRemaining}s`;
+        } else {
+            // Start new bonus round when current one ends
+            startBonusRound();
+        }
+    }, 1000);
+}
+
 // Initialize game
 window.onload = function() {
     console.log("window.onload started");
@@ -108,7 +222,14 @@ function startGame() {
     timeRemaining = GAME_DURATION;
     score = 0;
     discs = [];
+    bonusColor = null;
+    bonusActive = false;
+    bonusTimeRemaining = 15;
+    if (bonusTimer) clearTimeout(bonusTimer);
     console.log('Game state initialized:', { gameRunning, timeRemaining, score });
+
+    // Set up initial bonus activation after 15 seconds
+    setTimeout(startBonusRound, 15000);
 
     // Hide UI elements
     console.log('Updating UI elements visibility');
@@ -192,7 +313,15 @@ function handleShot(event) {
     for (let i = discs.length - 1; i >= 0; i--) {
         if (discs[i].containsPoint(x, y)) {
             // Add points based on color
-            score += POINTS[discs[i].color];
+            let points = POINTS[discs[i].color];
+
+            // Double points if bonus is active and color matches
+            if (bonusActive && discs[i].color === bonusColor) {
+                points *= 2;
+                console.log('Bonus points awarded!');
+            }
+
+            score += points;
             updateScore();
 
             // Remove hit disc
@@ -233,6 +362,43 @@ function endGame() {
     gameRunning = false;
     clearInterval(spawnInterval);
     clearInterval(timerInterval);
+
+    // Clean up bonus with fade-out effect
+    if (bonusTimer) {
+        clearInterval(bonusTimer);
+        bonusTimer = null;
+    }
+    bonusActive = false;
+    bonusColor = null;
+
+    // Clean up bonus display and animations
+    const bonusDisplay = document.getElementById('bonusDisplay');
+    if (bonusDisplay) {
+        // Stop animations
+        const colorSquare = bonusDisplay.children[0];
+        if (colorSquare) {
+            colorSquare.style.animation = 'none';
+            colorSquare.style.transform = 'scale(1)';
+            colorSquare.style.boxShadow = 'none';
+        }
+
+        // Fade out and remove
+        bonusDisplay.style.opacity = '0';
+        setTimeout(() => {
+            bonusDisplay.remove();
+            // Remove animation style
+            const pulseStyle = document.getElementById('pulseAnimation');
+            if (pulseStyle) {
+                pulseStyle.remove();
+            }
+        }, 300); // Match transition duration
+    }
+
+    // Clear any pending bonus activation
+    const allTimeouts = setTimeout(() => {}, 0);
+    for (let i = 0; i < allTimeouts; i++) {
+        clearTimeout(i);
+    }
 
     // Show final score, restart button, and instructions
     const finalScoreElement = document.getElementById('finalScore');
