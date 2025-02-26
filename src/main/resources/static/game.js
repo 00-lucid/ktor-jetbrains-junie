@@ -2,8 +2,14 @@
 const GAME_DURATION = 60; // seconds
 const DISC_COLORS = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00']; // red, green, blue, yellow
 const TRAP_COLOR = '#000000'; // black for trap disc
-const DISC_RADIUS = 20;
+const BASE_DISC_RADIUS = 20;
 const DISC_SPAWN_INTERVAL = 1000; // spawn new disc every second
+
+// Function to calculate scaled disc radius based on screen size
+function getScaledDiscRadius() {
+    const minDimension = Math.min(canvas.width, canvas.height);
+    return Math.max(10, Math.min(BASE_DISC_RADIUS, minDimension / 20));
+}
 const POINTS = {
     '#FF0000': 10,  // red
     '#00FF00': 20,  // green
@@ -29,16 +35,19 @@ const FRAGMENT_MIN_SPEED = 4;
 const FRAGMENT_MAX_SPEED = 7;
 
 class Fragment {
-    constructor(x, y, color, angle, speed) {
+    constructor(x, y, color, angle, speed, parentRadius) {
         this.x = x;
         this.y = y;
         this.color = color;
-        this.size = 4;
+        // Scale fragment size with parent disc
+        this.size = Math.max(3, parentRadius / 4);
         this.opacity = 1;
         this.rotation = Math.random() * Math.PI * 2;
         this.rotationSpeed = (Math.random() - 0.5) * 0.4;
-        this.velocityX = Math.cos(angle) * speed;
-        this.velocityY = Math.sin(angle) * speed;
+        // Scale velocity with screen size
+        const velocityScale = Math.min(canvas.width, canvas.height) / 800;
+        this.velocityX = Math.cos(angle) * speed * velocityScale;
+        this.velocityY = Math.sin(angle) * speed * velocityScale;
     }
 
     update() {
@@ -187,11 +196,47 @@ window.onload = function() {
     console.log("Canvas element:", canvas);
 
     if (canvas) {
-        console.log("Canvas dimensions:", canvas.width, "x", canvas.height);
+        // Set canvas size based on container
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            console.log("Canvas resized to:", canvas.width, "x", canvas.height);
+        }
+
+        // Initial resize and setup
+        resizeCanvas();
         ctx = canvas.getContext('2d');
         console.log("Canvas context:", ctx ? "obtained" : "failed");
+
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+
+        // Handle touch events
+        canvas.addEventListener('touchstart', handleTouch);
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault(); // Prevent scrolling
+        }, { passive: false });
     } else {
         console.error("Canvas element not found!");
+    }
+
+    function handleTouch(e) {
+        e.preventDefault();
+        if (!gameRunning) return;
+
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+
+        // Check for hits in reverse order (to handle overlapping discs)
+        for (let i = discs.length - 1; i >= 0; i--) {
+            if (discs[i].containsPoint(x, y)) {
+                handleDiscHit(i);
+                break;
+            }
+        }
     }
 
     // Add event listeners
@@ -224,15 +269,22 @@ class Disc {
         // Calculate scaling factors based on remaining time (60 to 0 seconds)
         const timeScale = 1 - (timeRemaining / GAME_DURATION); // 0 to 1
 
+        // Get base radius scaled to screen size
+        const baseRadius = getScaledDiscRadius();
+
         // Disc size decreases (100% to 50% of original size)
-        this.radius = DISC_RADIUS * (1 - timeScale * 0.5);
+        this.radius = baseRadius * (1 - timeScale * 0.5);
 
         // Speed increases (1x to 2.5x)
         const speedMultiplier = 1 + (timeScale * 1.5);
-        const baseSpeed = 4;
+        // Scale base speed with screen size
+        const baseSpeed = Math.min(canvas.width, canvas.height) / 100;
 
-        this.x = Math.random() * (canvas.width - 2 * this.radius) + this.radius;
-        this.y = Math.random() * (canvas.height - 2 * this.radius) + this.radius;
+        // Ensure discs spawn fully on screen
+        const margin = this.radius * 2;
+        this.x = margin + Math.random() * (canvas.width - margin * 2);
+        this.y = margin + Math.random() * (canvas.height - margin * 2);
+
         // 10% chance for trap disc
         this.color = Math.random() < 0.1 ? TRAP_COLOR : DISC_COLORS[Math.floor(Math.random() * DISC_COLORS.length)];
         this.speedX = (Math.random() - 0.5) * baseSpeed * speedMultiplier;
@@ -261,7 +313,9 @@ class Disc {
     }
 
     containsPoint(x, y) {
-        const hitRadius = this.radius * 1.5; // 50% larger hit detection area
+        // Larger hit area for touch devices
+        const isTouchDevice = 'ontouchstart' in window;
+        const hitRadius = this.radius * (isTouchDevice ? 2.0 : 1.5); // 100% larger for touch, 50% for mouse
         const distance = Math.sqrt((this.x - x) ** 2 + (this.y - y) ** 2);
         return distance <= hitRadius;
     }
@@ -365,6 +419,31 @@ function updateScore() {
     document.getElementById('score').textContent = `Score: ${score}`;
 }
 
+function handleDiscHit(index) {
+    // Add points based on color
+    let points = POINTS[discs[index].color];
+
+    // Double points if bonus is active and color matches
+    if (bonusActive && discs[index].color === bonusColor) {
+        points *= 2;
+        console.log('Bonus points awarded!');
+    }
+
+    score += points;
+    updateScore();
+
+    // Create fragments for shatter effect
+    const numFragments = Math.max(8, Math.min(15, Math.floor(discs[index].radius))); // Scale fragments with disc size
+    for (let j = 0; j < numFragments; j++) {
+        const angle = (j / numFragments) * Math.PI * 2 + Math.random() * 0.5 - 0.25;
+        const speed = FRAGMENT_MIN_SPEED + Math.random() * (FRAGMENT_MAX_SPEED - FRAGMENT_MIN_SPEED);
+        fragments.push(new Fragment(discs[index].x, discs[index].y, discs[index].color, angle, speed, discs[index].radius));
+    }
+
+    // Remove hit disc
+    discs.splice(index, 1);
+}
+
 function handleShot(event) {
     if (!gameRunning) return;
 
@@ -375,28 +454,7 @@ function handleShot(event) {
     // Check for hits in reverse order (to handle overlapping discs from newest to oldest)
     for (let i = discs.length - 1; i >= 0; i--) {
         if (discs[i].containsPoint(x, y)) {
-            // Add points based on color
-            let points = POINTS[discs[i].color];
-
-            // Double points if bonus is active and color matches
-            if (bonusActive && discs[i].color === bonusColor) {
-                points *= 2;
-                console.log('Bonus points awarded!');
-            }
-
-            score += points;
-            updateScore();
-
-            // Create fragments for shatter effect
-            const numFragments = 15;
-            for (let j = 0; j < numFragments; j++) {
-                const angle = (j / numFragments) * Math.PI * 2 + Math.random() * 0.5 - 0.25;
-                const speed = FRAGMENT_MIN_SPEED + Math.random() * (FRAGMENT_MAX_SPEED - FRAGMENT_MIN_SPEED);
-                fragments.push(new Fragment(discs[i].x, discs[i].y, discs[i].color, angle, speed));
-            }
-
-            // Remove hit disc
-            discs.splice(i, 1);
+            handleDiscHit(i);
             break;
         }
     }
