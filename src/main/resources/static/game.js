@@ -176,13 +176,22 @@ window.onload = function() {
 // Disc class
 class Disc {
     constructor() {
-        this.radius = DISC_RADIUS;
+        // Calculate scaling factors based on remaining time (60 to 0 seconds)
+        const timeScale = 1 - (timeRemaining / GAME_DURATION); // 0 to 1
+
+        // Disc size decreases (100% to 50% of original size)
+        this.radius = DISC_RADIUS * (1 - timeScale * 0.5);
+
+        // Speed increases (1x to 2.5x)
+        const speedMultiplier = 1 + (timeScale * 1.5);
+        const baseSpeed = 4;
+
         this.x = Math.random() * (canvas.width - 2 * this.radius) + this.radius;
         this.y = Math.random() * (canvas.height - 2 * this.radius) + this.radius;
         // 10% chance for trap disc
         this.color = Math.random() < 0.1 ? TRAP_COLOR : DISC_COLORS[Math.floor(Math.random() * DISC_COLORS.length)];
-        this.speedX = (Math.random() - 0.5) * 4;
-        this.speedY = (Math.random() - 0.5) * 4;
+        this.speedX = (Math.random() - 0.5) * baseSpeed * speedMultiplier;
+        this.speedY = (Math.random() - 0.5) * baseSpeed * speedMultiplier;
     }
 
     update() {
@@ -264,6 +273,7 @@ function startGame() {
 
     // Start spawning discs
     console.log('Setting up spawn interval');
+    if (spawnInterval) clearInterval(spawnInterval);
     spawnInterval = setInterval(spawnDisc, DISC_SPAWN_INTERVAL);
     console.log('Spawn interval set:', DISC_SPAWN_INTERVAL, 'ms');
 
@@ -286,6 +296,14 @@ function restartGame() {
 function spawnDisc() {
     if (gameRunning) {
         discs.push(new Disc());
+
+        // Adjust spawn interval based on remaining time
+        const timeScale = 1 - (timeRemaining / GAME_DURATION); // 0 to 1
+        const newInterval = DISC_SPAWN_INTERVAL * (1 - timeScale * 0.7); // Decrease to 30% of original time
+
+        // Clear and set new interval
+        clearInterval(spawnInterval);
+        spawnInterval = setInterval(spawnDisc, Math.max(200, newInterval)); // Minimum 200ms interval
     }
 }
 
