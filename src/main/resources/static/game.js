@@ -420,6 +420,19 @@ function updateScore() {
     document.getElementById('score').textContent = `Score: ${score}`;
 }
 
+function showPoints(x, y, points) {
+    const pointsText = document.createElement('div');
+    pointsText.className = 'floating-score';
+    pointsText.textContent = (points >= 0 ? '+' : '') + points;
+    pointsText.style.left = x + 'px';
+    pointsText.style.top = y + 'px';
+    pointsText.style.color = points >= 0 ? '#4CAF50' : '#FF5252';
+    document.getElementById('gameContainer').appendChild(pointsText);
+
+    // Remove element after animation
+    setTimeout(() => pointsText.remove(), 1000);
+}
+
 function handleDiscHit(index) {
     // Add points based on color
     let points = POINTS[discs[index].color];
@@ -429,6 +442,9 @@ function handleDiscHit(index) {
         points *= 2;
         console.log('Bonus points awarded!');
     }
+
+    // Show floating points at disc position
+    showPoints(discs[index].x, discs[index].y, points);
 
     score += points;
     updateScore();
