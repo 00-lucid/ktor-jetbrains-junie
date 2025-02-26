@@ -114,6 +114,7 @@ function startBonusRound() {
         bonusDisplay.style.display = 'flex';
         bonusDisplay.style.alignItems = 'center';
         bonusDisplay.style.gap = '10px';
+        bonusDisplay.style.pointerEvents = 'none';
 
         // Create color square
         const colorSquare = document.createElement('div');
