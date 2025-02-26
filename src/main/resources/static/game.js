@@ -18,8 +18,53 @@ let gameRunning = false;
 let timeRemaining = GAME_DURATION;
 let score = 0;
 let discs = [];
+let fragments = [];
 let spawnInterval;
 let timerInterval;
+
+// Physics constants
+const GRAVITY = 0.3;
+const FRAGMENT_FADE_SPEED = 0.015;
+const FRAGMENT_MIN_SPEED = 4;
+const FRAGMENT_MAX_SPEED = 7;
+
+class Fragment {
+    constructor(x, y, color, angle, speed) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.size = 4;
+        this.opacity = 1;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.4;
+        this.velocityX = Math.cos(angle) * speed;
+        this.velocityY = Math.sin(angle) * speed;
+    }
+
+    update() {
+        // Apply physics
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+        this.velocityY += GRAVITY;
+        this.rotation += this.rotationSpeed;
+        this.opacity -= FRAGMENT_FADE_SPEED;
+        return this.opacity > 0;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.opacity;
+
+        // Draw a square instead of a circle for better rotation visibility
+        const halfSize = this.size / 2;
+        ctx.fillRect(-halfSize, -halfSize, this.size, this.size);
+
+        ctx.restore();
+    }
+}
 
 // Bonus variables
 let bonusColor = null;
@@ -342,6 +387,14 @@ function handleShot(event) {
             score += points;
             updateScore();
 
+            // Create fragments for shatter effect
+            const numFragments = 15;
+            for (let j = 0; j < numFragments; j++) {
+                const angle = (j / numFragments) * Math.PI * 2 + Math.random() * 0.5 - 0.25;
+                const speed = FRAGMENT_MIN_SPEED + Math.random() * (FRAGMENT_MAX_SPEED - FRAGMENT_MIN_SPEED);
+                fragments.push(new Fragment(discs[i].x, discs[i].y, discs[i].color, angle, speed));
+            }
+
             // Remove hit disc
             discs.splice(i, 1);
             break;
@@ -371,6 +424,15 @@ function gameLoop() {
     discs.forEach(disc => {
         disc.update();
         disc.draw();
+    });
+
+    // Update and draw fragments
+    fragments = fragments.filter(fragment => {
+        const isActive = fragment.update();
+        if (isActive) {
+            fragment.draw(ctx);
+        }
+        return isActive;
     });
 
     requestAnimationFrame(gameLoop);
@@ -441,6 +503,7 @@ function endGame() {
         restartButton.style.opacity = '1';
     }, 50);
 
-    // Clear all discs
+    // Clear all discs and fragments
     discs = [];
+    fragments = [];
 }
