@@ -200,15 +200,29 @@ window.onload = function() {
         // Set canvas size based on container and device pixel ratio
         function resizeCanvas() {
             const container = canvas.parentElement;
-            const dpr = window.devicePixelRatio || 1;
+            // const dpr = window.devicePixelRatio || 1;
+            const dpr = 1;
+
+            // Check if we're in mobile environment (container width < 425px)
+            const isMobile = container.clientWidth < 425;
+
+            // Set appropriate dimensions based on environment
+            let targetWidth, targetHeight;
+            if (isMobile) {
+                targetWidth = 320;
+                targetHeight = 564;
+            } else {
+                targetWidth = 800;
+                targetHeight = 600;
+            }
 
             // Set display size (css pixels)
-            canvas.style.width = container.clientWidth + "px";
-            canvas.style.height = container.clientHeight + "px";
+            canvas.style.width = targetWidth + "px";
+            canvas.style.height = targetHeight + "px";
 
             // Set actual size in memory (scaled to account for extra pixel density)
-            canvas.width = Math.floor(container.clientWidth * dpr);
-            canvas.height = Math.floor(container.clientHeight * dpr);
+            canvas.width = Math.floor(targetWidth * dpr);
+            canvas.height = Math.floor(targetHeight * dpr);
 
             // Reset the context and its scale
             ctx = canvas.getContext('2d');

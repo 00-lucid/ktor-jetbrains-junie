@@ -14,8 +14,8 @@
                 margin: 0;
             }
             #gameContainer {
-                width: 100% !important;
-                height: 95vh !important;
+                width: 320px !important;
+                height: 594px !important;
                 margin: 0 !important;
                 border: none !important;
                 position: absolute !important;
@@ -129,7 +129,7 @@
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
 
         <!-- Game UI Container -->
         <div id="gameUI">
@@ -162,14 +162,6 @@
         </div>
     </div>
     <style>
-        /* Game Container */
-        #gameContainer {
-            position: relative;
-            width: 800px;
-            height: 600px;
-            overflow: hidden;
-        }
-
         /* Game UI Container */
         #gameUI {
             position: absolute;
