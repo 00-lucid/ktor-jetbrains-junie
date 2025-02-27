@@ -197,21 +197,38 @@ window.onload = function() {
     console.log("Canvas element:", canvas);
 
     if (canvas) {
-        // Set canvas size based on container
+        // Set canvas size based on container and device pixel ratio
         function resizeCanvas() {
             const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            console.log("Canvas resized to:", canvas.width, "x", canvas.height);
+            const dpr = window.devicePixelRatio || 1;
+
+            // Set display size (css pixels)
+            canvas.style.width = container.clientWidth + "px";
+            canvas.style.height = container.clientHeight + "px";
+
+            // Set actual size in memory (scaled to account for extra pixel density)
+            canvas.width = Math.floor(container.clientWidth * dpr);
+            canvas.height = Math.floor(container.clientHeight * dpr);
+
+            // Reset the context and its scale
+            ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.scale(dpr, dpr);
+            }
+
+            console.log("Canvas resized to:", canvas.width, "x", canvas.height, "with DPR:", dpr);
         }
 
-        // Initial resize and setup
-        resizeCanvas();
-        ctx = canvas.getContext('2d');
-        console.log("Canvas context:", ctx ? "obtained" : "failed");
-
-        // Handle window resize
+        // Handle window resize and orientation change
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => {
+            // Small delay to ensure new dimensions are available
+            setTimeout(resizeCanvas, 100);
+        });
+
+        // Initial setup
+        resizeCanvas();
+        console.log("Canvas context:", ctx ? "obtained" : "failed");
 
         // Handle touch events
         canvas.addEventListener('touchstart', handleTouch);
